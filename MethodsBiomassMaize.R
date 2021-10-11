@@ -3,7 +3,7 @@
 
 DataSet<-read.table("BiomassMais.txt", sep="\t", header=T)
 
-#PCR
+#Model PCR
 library(pls)
 Mod_pcr<-pcr(B~T1+T2+T3+RAD1+RAD2+RAD3, data=DataSet, validation="CV", segments=17,segment.type = "consecutive", scale="TRUE")
 summary(Mod_pcr)
