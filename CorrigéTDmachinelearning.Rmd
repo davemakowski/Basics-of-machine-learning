@@ -1,0 +1,128 @@
+---
+title: "TD Machine learning"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(glmnet)
+library(pls)
+library(randomForest)
+library(corrplot)
+```
+
+## Lecture et résumé des données
+
+On lit les données avec read.table et on résume leur distribution avec summary, boxplot, hist et matrice des corrélations.
+
+```{r data}
+Full_TAB_train<-read.table("TrainingDataSet_Maize.txt", sep="\t", header=T)
+Full_TAB_pred<-read.table("TestDataSet_Maize.txt", sep="\t", header=T)
+summary(Full_TAB_train)
+summary(Full_TAB_pred)
+boxplot(Full_TAB_train$yield_anomaly, xlab="Yield anomaly (t/ha")
+hist(Full_TAB_train$yield_anomaly, xlab="Yield anomaly (t/ha")
+nrow(Full_TAB_train)
+nrow(Full_TAB_pred)
+corrplot(cor(Full_TAB_train), tl.cex=0.5)
+```
+
+## Entrainement du LASSO
+On entraine le modèle LASSO pour une gamme de valeurs de pénalisation. On identifie ensuite le meilleur niveau de pénalisation par validation croisée.
+```{r lasso}
+X=as.matrix(Full_TAB_train[,-c(1,2,3)]) 
+Y=Full_TAB_train$yield_anomaly
+
+#Fit LASSO
+model <- glmnet(X, Y, alpha = 1)
+#Plot coefficients for different penalty levels
+plot(model, xvar="lambda", label=TRUE)
+#coef(model)
+
+#Validation croisée et sélection du meilleur lambda
+set.seed(1)
+cv <- cv.glmnet(X, Y, alpha = 1)
+plot(cv)
+model_sel <- glmnet(X, Y, alpha = 1, lambda = cv$lambda.min)
+print(model_sel)
+coef(model_sel)
+```
+
+## Utilisation du LASSO pour prédire les rendements du fichier Test
+On récupère le modèle sélectionné par validation croisée. On l'utilise pour prédire les rendements du fichier test et on calcule le RMSE.
+
+```{r lassopredictions}
+Xp=as.matrix(Full_TAB_pred[,-c(1,2,3)]) 
+Pred=predict(model_sel,newx = Xp)
+plot(Pred,Full_TAB_pred$yield_anomaly,xlab="Predictions", ylab="Observation")
+abline(0,1)
+RMSE=sqrt(mean((Full_TAB_pred$yield_anomaly-Pred)^2))
+print(RMSE)
+```
+
+## Entrainement de Random forest
+On ajuste un modèle random forest avec la fonction randomForest en utilisant les valeurs par défaut de ntree et mtry. On visualise ensuite l'effet de ntree graphiquement pour vérifier que le nombre d'arbres est suffisant. On teste plusieurs valeurs de mtry et on identifie la valeur expliquant le plus la variabilité des données. Finalement, on génère un graphique d'importance pour identifier les variables les plus influentes et on trace des partial dependence plots pour ces variables.
+
+```{r rf}
+#Default
+TrainingRF=Full_TAB_train[, -c(1,3)]
+model_rf=randomForest(yield_anomaly~., data=TrainingRF)
+model_rf
+summary(model_rf)
+plot(model_rf)
+#mtry=10
+#TrainingRF=Full_TAB_train[, -c(1,3)]
+#model_rf=randomForest(yield_anomaly~., data=TrainingRF,mtry=10)
+#model_rf
+varImpPlot(model_rf)
+#Partial dependence plot
+par(mfrow=c(2,2))
+partialPlot(model_rf, TrainingRF,x.var="PR_7")
+partialPlot(model_rf, TrainingRF,x.var="PR_8")
+partialPlot(model_rf, TrainingRF,x.var="RV_7")
+partialPlot(model_rf, TrainingRF,x.var="Tx_6")
+```
+
+## Test de random forest
+Utilisation du modèle random forest entrainé pour prédire les rendements du fichier test
+
+```{r rftest}
+Pred=predict(model_rf, newdata=Full_TAB_pred)
+plot(Pred,Full_TAB_pred$yield_anomaly,xlab="Predictions", ylab="Observation")
+abline(0,1)
+RMSE=sqrt(mean((Full_TAB_pred$yield_anomaly-Pred)^2))
+print(RMSE)
+
+```
+
+## Nouveau random forest avec moins de variables
+
+On développe un modèle incluant uniquement les six variables les plus influentes. On calcule son RMSE avec le fichier test
+
+```{r rfmini}
+#Default
+TrainingRF=Full_TAB_train[, -c(1,3)]
+model_rf_mini=randomForest(yield_anomaly~PR_8+PR_7+RV_7+Tx_6+SeqPR_8+Tx_8, data=TrainingRF)
+model_rf_mini
+Pred=predict(model_rf_mini, newdata=Full_TAB_pred)
+plot(Pred,Full_TAB_pred$yield_anomaly,xlab="Predictions", ylab="Observation")
+abline(0,1)
+RMSE=sqrt(mean((Full_TAB_pred$yield_anomaly-Pred)^2))
+print(RMSE)
+```
+
+## PLS
+
+Régression PLS: entrainement, identification du nombre de composantes optimal, prédictions et calcul de RMSE.
+
+```{r pls}
+TrainingPLS=Full_TAB_train[, -c(1,3)]
+Mod_pls<-plsr(yield_anomaly~PR_8+PR_7+RV_7+Tx_6+SeqPR_8+Tx_8, data=TrainingPLS, validation="LOO", scale="TRUE")
+summary(Mod_pls)
+
+Pred=predict(Mod_pls, newdata=Full_TAB_pred, ncomp=6)
+plot(Pred,Full_TAB_pred$yield_anomaly,xlab="Predictions", ylab="Observation")
+abline(0,1)
+RMSE=sqrt(mean((Full_TAB_pred$yield_anomaly-Pred)^2))
+print(RMSE)
+```
