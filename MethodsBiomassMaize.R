@@ -18,7 +18,7 @@ par(mfrow=c(1,1))
 plot(RMSEP(Mod_pcr), legend ="topright")
 plot(Mod_pcr, "loadings", comps=1:2, legendpos="topleft", ylim=c(-1,1))
 
-#PLSR
+# Model PLS
 Mod_pls<-plsr(B~T1+T2+T3+RAD1+RAD2+RAD3, data=DataSet, validation="CV", segments=17,segment.type = "consecutive", scale="TRUE")
 summary(Mod_pls)
 par(mfrow=c(2,3))
