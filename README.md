@@ -1,5 +1,5 @@
 # TP_machinelearning
-Courses and practical exercises on machine learning.
+Course and practical exercises on machine learning.
 
 The course includes four parts:
 - Part 1: Introduction, objectives and main principles
