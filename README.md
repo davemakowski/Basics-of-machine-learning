@@ -1,4 +1,4 @@
-# Basics of machinelearning
+# Basics of machine learning
 Course, practical exercises, and project on machine learning.
 
 The course includes four parts:
